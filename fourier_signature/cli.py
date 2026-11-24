@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--closing", choices=["auto", "retrace", "jump"], default="auto",
         help="how the path returns to its start (default auto)",
     )
-    p.add_argument("--points", type=int, default=3000, help="samples along the path (default 3000)")
+    p.add_argument("--points", type=int, default=3000, help="samples along the path, raised to fit --circles (default 3000)")
     p.add_argument("--smooth", type=float, default=3.0, help="smoothing strength, 0 disables (default 3)")
     p.add_argument("--caption", help="small caption at the bottom of the animation and poster")
     p.add_argument("--no-circles", action="store_true", help="hide the circles, show only the ink")
@@ -55,10 +55,12 @@ def main(argv: list[str] | None = None) -> int:
     if not (args.output or args.svg or args.poster):
         args.output = src.with_name(src.stem + "_fourier.gif")
 
+    # N samples give at most N - 1 circles, and retrace closing drops up to 3 samples.
+    n_points = max(args.points, max(args.circles, args.svg_circles) + 4)
     if src.suffix.lower() in IMAGE_EXT:
-        z = image_to_path(src, n_points=args.points, closing=args.closing, smooth=args.smooth)
+        z = image_to_path(src, n_points=n_points, closing=args.closing, smooth=args.smooth)
     else:
-        z = points_to_path(load_points(src), n_points=args.points, closing=args.closing,
+        z = points_to_path(load_points(src), n_points=n_points, closing=args.closing,
                            smooth=args.smooth)
 
     full = FourierSeries.from_points(z)

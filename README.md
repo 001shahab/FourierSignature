@@ -80,6 +80,7 @@ The animated SVG version lives in [`assets/demo.svg`](assets/demo.svg). Open it 
 | `--duration` | 10 | SVG loop length in seconds |
 | `--theme` | midnight | `midnight`, `paper` or `neon` |
 | `--closing` | auto | How the path returns home: `auto`, `retrace` or `jump` |
+| `--points` | 3000 | Samples along the path, raised automatically to fit `--circles` |
 | `--smooth` | 3 | Smoothing of the traced path, 0 disables |
 | `--caption` | | Small caption under the drawing |
 | `--no-circles` | | Hide the circles and show only the ink |

@@ -122,3 +122,11 @@ def test_cli_end_to_end(signature_png, tmp_path):
     assert Image.open(gif).n_frames > 1
     assert svg.stat().st_size > 1000
     assert Image.open(png).size[0] > 1000
+
+
+@pytest.mark.parametrize("closing", ["retrace", "jump"])
+def test_cli_honours_circles_above_points(signature_png, tmp_path, capsys, closing):
+    code = main([str(signature_png), "--poster", str(tmp_path / "a.png"), "--circles", "501",
+                 "--points", "200", "--closing", closing])
+    assert code == 0
+    assert capsys.readouterr().out.startswith("501 circles")

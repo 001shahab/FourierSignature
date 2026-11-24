@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fourier Signature</title>
+<meta name="description" content="Draw your signature and watch rotating circles redraw it. By Prof. Shahab Anbarjafari.">
+<meta name="author" content="Prof. Shahab Anbarjafari">
+<style>
+  :root {
+    --bg: #0b1020; --panel: #111833; --line: #222c52; --text: #e6ebff; --muted: #8b97b8;
+    --circle: 122,162,255; --arm: #c9d6ff; --ink: #ffd27a; --glow: #ff9f43; --accent: #ffd27a;
+  }
+  :root[data-theme="paper"] {
+    --bg: #f7f3ea; --panel: #fffdf7; --line: #e4dccb; --text: #1f2433; --muted: #7a7466;
+    --circle: 107,122,153; --arm: #3c4660; --ink: #1d2a6b; --glow: #5468ff; --accent: #1d2a6b;
+  }
+  :root[data-theme="neon"] {
+    --bg: #07070c; --panel: #0e0e18; --line: #23233a; --text: #f1f1ff; --muted: #6c6c8a;
+    --circle: 0,229,255; --arm: #9bf6ff; --ink: #ff4fd8; --glow: #ff4fd8; --accent: #00e5ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 32px 20px 40px; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { margin: 0; font-size: 30px; letter-spacing: -0.02em; font-weight: 700; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  .stage { position: relative; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 18px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  canvas { display: block; width: 100%; height: min(62vh, 520px); touch-action: none; cursor: crosshair; }
+  .hint { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
+    color: var(--muted); font-size: 18px; transition: opacity .3s; }
+  .hint.hidden { opacity: 0; }
+  .stats { position: absolute; left: 16px; bottom: 12px; color: var(--muted); font-size: 12px;
+    font-variant-numeric: tabular-nums; pointer-events: none; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 16px; }
+  .group { display: flex; align-items: center; gap: 10px; }
+  label { color: var(--muted); font-size: 13px; }
+  input[type=range] { width: 120px; accent-color: var(--accent); }
+  output { min-width: 3.2em; font-variant-numeric: tabular-nums; font-size: 13px; }
+  button, select { background: transparent; color: var(--text); border: 1px solid var(--line);
+    padding: 8px 14px; border-radius: 10px; font: inherit; font-size: 14px; cursor: pointer; }
+  button:hover, select:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .4; cursor: default; }
+  .spacer { flex: 1; }
+  footer { margin-top: 28px; color: var(--muted); font-size: 13px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  footer a { color: inherit; }
+  .explain { margin-top: 22px; color: var(--muted); font-size: 14px; max-width: 760px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Fourier <span>Signature</span></h1>
+      <p class="sub">Sign below. Rotating circles will learn your signature and redraw it.</p>
+    </div>
+    <div class="group">
+      <label for="theme">Theme</label>
+      <select id="theme">
+        <option value="midnight">Midnight</option>
+        <option value="paper">Paper</option>
+        <option value="neon">Neon</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="stage">
+    <canvas id="c" aria-label="Signature canvas"></canvas>
+    <div class="hint" id="hint">Draw your signature here</div>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="play">Play</button>
+    <button id="sample">Sample</button>
+    <button id="undo">Undo stroke</button>
+    <button id="clear">Clear</button>
+    <div class="group">
+      <label for="circles">Circles</label>
+      <input id="circles" type="range" min="1" max="400" value="150">
+      <output id="circlesOut">150</output>
+    </div>
+    <div class="group">
+      <label for="speed">Speed</label>
+      <input id="speed" type="range" min="1" max="10" value="4">
+    </div>
+    <div class="spacer"></div>
+    <button id="png">Save PNG</button>
+    <button id="json">Export points</button>
+  </div>
+
+  <p class="explain">
+    Every closed curve is a sum of rotating vectors: z(t) = &Sigma; c<sub>k</sub> e<sup>2&pi;ikt</sup>.
+    The discrete Fourier transform finds one circle per frequency; adding them tip to tail retraces your
+    pen. Fewer circles give a smooth sketch, more circles recover every detail. Exported points can be
+    rendered to GIF, MP4 or animated SVG with the <code>fourier-signature</code> command line tool.
+  </p>
+
+  <footer>
+    <span>Designed and developed by Prof. Shahab Anbarjafari (<a href="mailto:shb@3sholding.com">shb@3sholding.com</a>)</span>
+    <a href="https://github.com/001shahab/FourierSignature">github.com/001shahab/FourierSignature</a>
+  </footer>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const SAMPLE = [[-299.6,37.9],[-298.7,28.3],[-297.6,20.6],[-296.4,15.5],[-295.1,12.9],[-293.6,12.2],[-291.9,12.8],[-289.9,14.1],[-287.4,15.5],[-284.6,16.7],[-281.4,17.6],[-277.9,18.2],[-274.2,18.2],[-270.5,17.9],[-266.8,17.0],[-263.2,15.7],[-259.9,13.9],[-256.9,11.6],[-254.2,9.0],[-252.0,6.0],[-250.2,2.7],[-248.9,-0.8],[-248.2,-4.4],[-248.1,-8.0],[-248.5,-11.6],[-249.6,-15.1],[-251.2,-18.5],[-253.3,-21.7],[-255.8,-24.8],[-258.6,-27.7],[-261.5,-30.5],[-264.5,-33.3],[-267.3,-36.2],[-270.0,-39.1],[-272.3,-42.2],[-274.2,-45.5],[-275.5,-48.9],[-276.3,-52.4],[-276.5,-56.0],[-276.0,-59.5],[-275.0,-63.0],[-273.4,-66.3],[-271.3,-69.4],[-268.8,-72.1],[-265.9,-74.3],[-262.7,-76.1],[-259.3,-77.4],[-255.7,-78.1],[-252.2,-78.3],[-248.8,-77.8],[-245.6,-76.8],[-242.7,-75.2],[-240.2,-73.2],[-238.1,-70.8],[-236.1,-68.1],[-234.3,-65.4],[-232.2,-62.7],[-229.9,-60.4],[-227.2,-58.4],[-224.1,-56.8],[-220.7,-55.8],[-217.2,-55.2],[-213.7,-55.2],[-210.4,-55.7],[-207.5,-56.7],[-205.1,-58.4],[-203.2,-60.5],[-201.7,-62.9],[-200.7,-65.2],[-200.1,-67.2],[-199.7,-68.4],[-199.5,-68.8],[-199.6,-68.2],[-199.8,-66.5],[-200.1,-64.1],[-200.6,-61.0],[-201.2,-57.5],[-201.9,-53.7],[-202.6,-49.8],[-203.4,-45.8],[-204.2,-41.8],[-204.9,-37.8],[-205.6,-33.7],[-206.2,-29.6],[-206.9,-25.6],[-207.5,-21.5],[-208.2,-17.4],[-209.0,-13.4],[-209.7,-9.3],[-210.6,-5.4],[-211.5,-1.5],[-212.5,2.3],[-213.5,5.8],[-214.6,9.1],[-215.5,11.8],[-216.3,13.9],[-216.9,15.1],[-217.0,15.5],[-216.7,14.9],[-216.1,13.4],[-215.3,11.1],[-214.2,8.3],[-213.1,5.0],[-212.0,1.6],[-210.8,-2.0],[-209.4,-5.4],[-207.8,-8.8],[-206.1,-11.9],[-204.0,-14.9],[-201.8,-17.7],[-199.3,-20.5],[-196.6,-23.2],[-193.9,-25.8],[-191.0,-28.3],[-188.1,-30.5],[-185.1,-32.2],[-182.2,-33.4],[-179.5,-33.9],[-177.1,-33.5],[-175.0,-32.2],[-173.5,-30.2],[-172.6,-27.5],[-172.1,-24.3],[-172.0,-20.7],[-172.2,-16.9],[-172.6,-12.9],[-173.0,-9.0],[-173.4,-5.0],[-173.6,-1.3],[-173.5,2.3],[-173.0,5.4],[-172.0,8.0],[-170.5,9.9],[-168.5,11.0],[-166.1,11.4],[-163.5,11.2],[-160.8,10.5],[-158.0,9.5],[-155.2,8.4],[-152.5,7.3],[-149.7,6.1],[-147.1,4.7],[-144.7,3.0],[-142.5,0.9],[-140.7,-1.6],[-139.0,-4.6],[-137.5,-7.9],[-136.0,-11.3],[-134.5,-14.9],[-132.7,-18.5],[-130.8,-22.0],[-128.7,-25.3],[-126.2,-28.5],[-123.6,-31.4],[-120.7,-34.1],[-117.6,-36.4],[-114.3,-38.2],[-111.0,-39.5],[-107.8,-40.3],[-104.9,-40.6],[-102.3,-40.5],[-100.3,-40.2],[-98.9,-40.0],[-98.3,-39.8],[-98.5,-40.0],[-99.6,-40.3],[-101.3,-40.6],[-103.7,-40.8],[-106.5,-40.6],[-109.6,-40.0],[-112.9,-38.8],[-116.2,-37.2],[-119.4,-35.1],[-122.4,-32.6],[-125.2,-29.7],[-127.7,-26.6],[-129.9,-23.3],[-131.9,-19.9],[-133.5,-16.3],[-134.9,-12.6],[-135.9,-8.8],[-136.5,-5.0],[-136.6,-1.2],[-136.3,2.4],[-135.5,5.7],[-134.1,8.5],[-132.1,10.8],[-129.7,12.3],[-126.9,13.0],[-123.9,12.9],[-120.8,12.0],[-117.6,10.6],[-114.5,8.7],[-111.6,6.5],[-108.9,4.0],[-106.4,1.3],[-104.3,-1.7],[-102.6,-4.9],[-101.1,-8.3],[-99.9,-11.7],[-98.9,-15.0],[-98.2,-18.0],[-97.6,-20.4],[-97.2,-21.9],[-97.1,-22.5],[-97.2,-22.1],[-97.5,-20.6],[-98.0,-18.3],[-98.6,-15.3],[-99.3,-12.0],[-99.9,-8.4],[-100.5,-4.8],[-100.8,-1.2],[-100.9,2.1],[-100.6,5.1],[-99.8,7.7],[-98.4,9.8],[-96.6,11.2],[-94.2,12.1],[-91.6,12.6],[-88.7,12.9],[-85.8,13.1],[-82.9,13.4],[-80.1,13.8],[-77.5,14.2],[-75.0,14.3],[-72.7,14.0],[-70.6,12.9],[-68.7,11.2],[-67.1,8.7],[-65.7,5.6],[-64.5,2.2],[-63.4,-1.5],[-62.4,-5.3],[-61.5,-9.3],[-60.6,-13.3],[-59.8,-17.3],[-59.1,-21.3],[-58.4,-25.4],[-57.8,-29.5],[-57.2,-33.6],[-56.5,-37.7],[-55.9,-41.8],[-55.2,-45.8],[-54.5,-49.9],[-53.9,-53.9],[-53.3,-57.8],[-52.9,-61.7],[-52.7,-65.4],[-52.9,-68.8],[-53.4,-71.9],[-54.1,-74.5],[-54.9,-76.5],[-55.6,-77.8],[-56.0,-78.4],[-55.9,-78.3],[-55.4,-77.4],[-54.7,-75.9],[-53.8,-73.7],[-53.1,-70.9],[-52.7,-67.7],[-52.7,-64.2],[-52.9,-60.4],[-53.3,-56.5],[-54.0,-52.5],[-54.7,-48.5],[-55.4,-44.6],[-56.0,-40.6],[-56.5,-36.8],[-56.8,-33.2],[-56.8,-29.9],[-56.4,-27.2],[-55.6,-25.2],[-54.2,-24.0],[-52.5,-23.7],[-50.3,-24.2],[-47.8,-25.5],[-45.1,-27.2],[-42.3,-29.2],[-39.3,-31.1],[-36.3,-32.6],[-33.4,-33.6],[-30.6,-33.9],[-28.2,-33.3],[-26.3,-31.9],[-24.9,-29.7],[-24.0,-26.9],[-23.6,-23.6],[-23.5,-20.0],[-23.8,-16.1],[-24.2,-12.2],[-24.7,-8.2],[-25.0,-4.3],[-25.3,-0.6],[-25.2,2.8],[-24.6,5.9],[-23.6,8.3],[-21.9,10.1],[-19.8,11.1],[-17.1,11.3],[-14.1,10.9],[-10.8,9.8],[-7.4,8.4],[-4.1,6.6],[-0.9,4.6],[2.1,2.3],[4.8,-0.3],[7.1,-3.2],[9.1,-6.3],[10.9,-9.6],[12.6,-13.1],[14.3,-16.6],[16.2,-20.2],[18.2,-23.6],[20.5,-26.8],[23.1,-29.9],[25.8,-32.7],[28.8,-35.2],[32.0,-37.2],[35.3,-38.8],[38.6,-39.8],[41.8,-40.2],[44.7,-40.0],[47.1,-39.3],[49.1,-38.3],[50.5,-37.3],[51.4,-36.5],[51.8,-36.2],[51.7,-36.4],[51.1,-37.1],[50.0,-38.2],[48.3,-39.2],[46.1,-40.1],[43.4,-40.4],[40.3,-40.3],[37.1,-39.5],[33.8,-38.2],[30.5,-36.3],[27.4,-34.1],[24.5,-31.4],[21.8,-28.5],[19.4,-25.3],[17.3,-22.0],[15.4,-18.5],[13.9,-14.8],[12.8,-11.1],[12.0,-7.3],[11.6,-3.5],[11.6,0.2],[12.2,3.6],[13.2,6.8],[14.8,9.4],[16.9,11.4],[19.4,12.6],[22.2,13.1],[25.2,12.7],[28.4,11.8],[31.5,10.3],[34.5,8.3],[37.3,6.1],[40.0,3.6],[42.3,0.9],[44.3,-2.0],[46.0,-5.1],[47.4,-8.3],[48.4,-11.3],[49.2,-13.9],[49.8,-15.9],[50.1,-17.0],[50.1,-17.1],[50.0,-16.2],[49.6,-14.4],[49.1,-11.8],[48.5,-8.7],[48.0,-5.3],[47.7,-1.9],[47.6,1.5],[47.9,4.6],[48.7,7.2],[50.1,9.2],[52.0,10.5],[54.4,11.1],[57.2,10.9],[60.2,10.2],[63.3,9.0],[66.5,7.5],[69.6,5.9],[72.6,4.2],[75.4,2.2],[77.9,0.0],[80.0,-2.5],[81.8,-5.5],[83.2,-8.7],[84.5,-12.3],[85.5,-16.0],[86.4,-19.9],[87.3,-23.9],[88.1,-27.9],[88.9,-31.9],[89.6,-36.0],[90.3,-40.0],[91.0,-44.1],[91.6,-48.1],[92.3,-52.2],[92.9,-56.2],[93.3,-60.1],[93.5,-63.9],[93.5,-67.5],[93.1,-70.7],[92.4,-73.5],[91.6,-75.8],[90.8,-77.4],[90.3,-78.4],[90.2,-78.7],[90.6,-78.3],[91.3,-77.3],[92.2,-75.6],[93.0,-73.4],[93.6,-70.7],[93.8,-67.5],[93.8,-63.9],[93.5,-60.2],[93.0,-56.3],[92.5,-52.4],[91.9,-48.6],[91.5,-44.9],[91.2,-41.4],[91.2,-38.3],[91.6,-35.8],[92.4,-33.9],[93.5,-32.6],[95.0,-32.1],[96.9,-32.2],[99.0,-32.8],[101.5,-33.8],[104.1,-35.0],[106.9,-36.1],[109.8,-37.0],[112.7,-37.5],[115.4,-37.6],[117.7,-37.2],[119.6,-36.7],[121.0,-36.1],[121.6,-35.8],[121.6,-35.8],[120.8,-36.2],[119.4,-36.8],[117.4,-37.3],[114.9,-37.6],[112.1,-37.4],[109.1,-36.7],[106.0,-35.5],[102.9,-33.9],[99.9,-32.0],[97.0,-29.8],[94.4,-27.4],[92.0,-24.8],[89.9,-21.8],[88.1,-18.6],[86.7,-15.1],[85.6,-11.4],[84.9,-7.6],[84.4,-3.7],[84.4,0.1],[84.7,3.8],[85.6,7.2],[86.9,10.3],[88.8,12.8],[91.2,14.6],[93.9,15.8],[97.0,16.1],[100.2,15.7],[103.4,14.6],[106.6,12.9],[109.5,10.6],[112.2,7.9],[114.6,4.8],[116.8,1.6],[118.6,-1.8],[120.2,-5.3],[121.5,-8.6],[122.6,-11.6],[123.5,-14.1],[124.1,-15.9],[124.7,-16.6],[125.1,-16.4],[125.5,-15.0],[125.9,-12.7],[126.3,-9.7],[126.7,-6.0],[127.2,-2.1],[127.7,2.0],[128.1,6.3],[128.6,10.6],[129.1,14.9],[129.6,19.2],[130.2,23.5],[130.7,27.8],[131.3,32.0],[132.0,36.0],[132.9,39.9],[134.1,43.4],[135.7,46.4],[137.7,48.9],[140.2,50.7],[143.1,51.9],[146.5,52.6],[150.1,52.8],[154.0,52.8],[158.0,52.4],[162.1,52.0],[166.1,51.4],[170.2,50.8],[174.3,50.2],[178.3,49.5],[182.3,48.8],[186.3,48.1],[190.3,47.4],[194.2,46.7],[198.1,45.9],[201.9,45.1],[205.8,44.3],[209.6,43.5],[213.5,42.6],[217.4,41.8],[221.3,40.8],[225.2,39.9],[229.1,38.8],[233.0,37.8],[236.9,36.7],[240.8,35.6],[244.7,34.4],[248.6,33.3],[252.4,32.1],[256.3,30.9],[260.1,29.6],[264.0,28.3],[267.8,27.0],[271.6,25.7],[275.3,24.3],[279.1,22.9],[282.8,21.4],[286.4,20.0],[289.8,18.6],[293.0,17.2],[295.8,16.0],[298.0,15.1],[299.5,14.4],[300.0,14.2],[299.6,14.4],[298.2,15.0],[296.1,15.9],[293.3,17.1],[290.2,18.4],[286.7,19.8],[283.1,21.3],[279.4,22.7],[275.7,24.2],[271.9,25.5],[268.1,26.9],[264.3,28.2],[260.5,29.5],[256.6,30.7],[252.8,32.0],[248.9,33.2],[245.1,34.3],[241.2,35.5],[237.3,36.6],[233.4,37.7],[229.5,38.8],[225.7,39.8],[221.8,40.8],[218.0,41.7],[214.3,42.6],[210.6,43.4],[207.0,44.2],[203.5,44.9],[200.0,45.6],[196.5,46.3],[193.0,47.0],[189.3,47.6],[185.6,48.3],[181.7,48.9],[177.8,49.6],[173.8,50.3],[169.7,50.9],[165.6,51.5],[161.5,52.1],[157.4,52.7],[153.3,53.2],[149.2,53.7],[145.0,54.2],[140.9,54.6],[136.8,55.0],[132.7,55.4],[128.6,55.8],[124.4,56.2],[120.3,56.5],[116.2,56.8],[112.0,57.2],[107.8,57.5],[103.6,57.7],[99.4,58.0],[95.1,58.2],[90.9,58.4],[86.6,58.6],[82.3,58.8],[78.1,59.0],[73.8,59.2],[69.5,59.4],[65.2,59.6],[60.9,59.7],[56.6,59.8],[52.3,59.9],[48.0,59.9],[43.6,60.0],[39.3,60.0],[34.9,60.0],[30.6,60.0],[26.2,60.0],[21.9,60.0],[17.5,60.0],[13.2,60.0],[8.8,60.0],[4.5,60.0],[0.1,60.0],[-4.3,60.0],[-8.6,60.0],[-13.0,60.0],[-17.3,60.0],[-21.7,60.0],[-26.0,60.0],[-30.4,60.0],[-34.7,60.0],[-39.1,60.0],[-43.4,60.0],[-47.8,60.0],[-52.1,60.0],[-56.5,60.0],[-60.8,60.0],[-65.2,60.0],[-69.5,60.0],[-73.9,60.0],[-78.3,60.0],[-82.6,60.0],[-87.0,60.0],[-91.3,60.0],[-95.6,60.0],[-100.0,60.1],[-104.3,60.2],[-108.6,60.3],[-112.9,60.4],[-117.2,60.5],[-121.5,60.6],[-125.8,60.8],[-130.1,60.9],[-134.4,61.1],[-138.7,61.2],[-143.0,61.4],[-147.3,61.6],[-151.5,61.7],[-155.8,61.9],[-160.1,62.1],[-164.3,62.4],[-168.6,62.6],[-172.8,62.9],[-177.0,63.2],[-181.3,63.5],[-185.5,63.9],[-189.7,64.2],[-193.9,64.6],[-198.0,65.1],[-202.2,65.5],[-206.3,66.0],[-210.5,66.5],[-214.6,67.0],[-218.8,67.5],[-222.9,68.1],[-227.1,68.6],[-231.2,69.1],[-235.3,69.7],[-239.4,70.2],[-243.5,70.8],[-247.6,71.5],[-251.7,72.2],[-255.7,72.9],[-259.8,73.7],[-263.8,74.5],[-267.8,75.4],[-271.7,76.3],[-275.7,77.1],[-279.7,77.9],[-283.6,78.5],[-287.3,78.7],[-290.9,78.0],[-294.1,76.1],[-296.7,72.4],[-298.6,66.4],[-299.7,58.1],[-300.0,48.2]];
+  const N = 1024;                       // samples fed to the DFT
+
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const $ = (id) => document.getElementById(id);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  let strokes = [];                     // array of arrays of [x, y] in CSS pixels
+  let drawing = false;
+  let series = null;                    // [{re, im, f, r}] sorted by radius
+  let t = 0, trail = [], playing = false, last = 0;
+
+  // ------------------------------------------------------------ canvas
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!playing) drawStrokes();
+  }
+  const size = () => canvas.getBoundingClientRect();
+
+  function clearCanvas() {
+    const r = size();
+    ctx.fillStyle = css("--panel");
+    ctx.fillRect(0, 0, r.width, r.height);
+  }
+
+  function drawStrokes() {
+    clearCanvas();
+    ctx.lineCap = ctx.lineJoin = "round";
+    ctx.strokeStyle = css("--ink");
+    ctx.lineWidth = 3;
+    for (const s of strokes) {
+      ctx.beginPath();
+      s.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.stroke();
+    }
+    $("hint").classList.toggle("hidden", strokes.length > 0);
+  }
+
+  // ------------------------------------------------------------ input
+  const pos = (e) => { const r = size(); return [e.clientX - r.left, e.clientY - r.top]; };
+  canvas.addEventListener("pointerdown", (e) => {
+    stop(); series = null; drawing = true;
+    canvas.setPointerCapture(e.pointerId);
+    strokes.push([pos(e)]); drawStrokes();
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drawing) return;
+    const p = pos(e), s = strokes[strokes.length - 1], q = s[s.length - 1];
+    if (Math.hypot(p[0] - q[0], p[1] - q[1]) < 1.5) return;
+    s.push(p);
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(p[0], p[1]); ctx.stroke();
+  });
+  const end = () => { if (drawing) { drawing = false; updateButtons(); } };
+  canvas.addEventListener("pointerup", end);
+  canvas.addEventListener("pointercancel", end);
+
+  // ------------------------------------------------------------ maths
+  function resample(pts, n) {
+    const L = [0];
+    for (let i = 1; i < pts.length; i++)
+      L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const total = L[L.length - 1] || 1, out = [];
+    let j = 0;
+    for (let k = 0; k < n; k++) {
+      const s = (k / (n - 1)) * total;
+      while (j < L.length - 2 && L[j + 1] < s) j++;
+      const seg = L[j + 1] - L[j] || 1, a = (s - L[j]) / seg;
+      out.push([pts[j][0] + a * (pts[j + 1][0] - pts[j][0]), pts[j][1] + a * (pts[j + 1][1] - pts[j][1])]);
+    }
+    return out;
+  }
+
+  function buildPath() {
+    let pts = strokes.flat();
+    if (pts.length < 2) return null;
+    // Same closing rule as the Python package: jump home if close, else retrace.
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) || 1;
+    const a = pts[0], b = pts[pts.length - 1];
+    const retrace = Math.hypot(a[0] - b[0], a[1] - b[1]) / span > 0.25;
+    let path = resample(pts, retrace ? N / 2 : N);
+    if (retrace) path = path.concat(path.slice(1, -1).reverse());
+    return path;
+  }
+
+  function dft(path) {
+    const n = path.length, out = [];
+    for (let k = 0; k < n; k++) {
+      const f = k <= n / 2 ? k : k - n;
+      let re = 0, im = 0;
+      for (let m = 0; m < n; m++) {
+        const phi = (-2 * Math.PI * f * m) / n;
+        const c = Math.cos(phi), s = Math.sin(phi);
+        re += path[m][0] * c - path[m][1] * s;
+        im += path[m][0] * s + path[m][1] * c;
+      }
+      re /= n; im /= n;
+      out.push({ re, im, f, r: Math.hypot(re, im) });
+    }
+    const dc = out.find((c) => c.f === 0);
+    return [dc].concat(out.filter((c) => c.f !== 0).sort((p, q) => q.r - p.r));
+  }
+
+  // ------------------------------------------------------------ animation
+  function frame(now) {
+    if (!playing) return;
+    const dt = Math.min((now - last) / 1000, 0.05); last = now;
+    const speed = +$("speed").value;
+    const steps = 6;
+    const K = Math.min(+$("circles").value + 1, series.length);
+    const r = size();
+    clearCanvas();
+
+    // Advance in small sub-steps so fast strokes stay smooth.
+    let x = 0, y = 0;
+    for (let s = 0; s < steps; s++) {
+      t += (dt * speed * 0.025) / steps;
+      if (t >= 1) { t -= 1; trail = []; }
+      [x, y] = tip(K, t);
+      trail.push([x, y]);
+    }
+
+    // Trail with glow.
+    ctx.lineCap = ctx.lineJoin = "round";
+    for (const [w, col, a] of [[9, css("--glow"), 0.14], [2.6, css("--ink"), 1]]) {
+      ctx.globalAlpha = a; ctx.strokeStyle = col; ctx.lineWidth = w;
+      ctx.beginPath();
+      trail.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Circles and arms.
+    const rgb = css("--circle");
+    let cx = series[0].re, cy = series[0].im;
+    ctx.lineWidth = 1;
+    const arms = [[cx, cy]];
+    for (let i = 1; i < K; i++) {
+      const c = series[i], ang = 2 * Math.PI * c.f * t;
+      const vx = c.re * Math.cos(ang) - c.im * Math.sin(ang);
+      const vy = c.re * Math.sin(ang) + c.im * Math.cos(ang);
+      if (c.r > 0.6) {
+        const a = 0.4 * Math.pow(1 - (0.75 * i) / K, 1.5);
+        ctx.strokeStyle = `rgba(${rgb},${a.toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(cx, cy, c.r, 0, 2 * Math.PI); ctx.stroke();
+      }
+      cx += vx; cy += vy; arms.push([cx, cy]);
+    }
+    ctx.strokeStyle = css("--arm"); ctx.globalAlpha = 0.75; ctx.lineWidth = 1;
+    ctx.beginPath(); arms.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py))); ctx.stroke();
+    ctx.globalAlpha = 0.3; ctx.fillStyle = css("--glow");
+    ctx.beginPath(); ctx.arc(cx, cy, 8, 0, 2 * Math.PI); ctx.fill();
+    ctx.globalAlpha = 1; ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(cx, cy, 3, 0, 2 * Math.PI); ctx.fill();
+
+    $("stats").textContent = `${K - 1} circles  ·  t = ${t.toFixed(3)}`;
+    requestAnimationFrame(frame);
+  }
+
+  function tip(K, tt) {
+    let x = 0, y = 0;
+    for (let i = 0; i < K; i++) {
+      const c = series[i], ang = 2 * Math.PI * c.f * tt;
+      x += c.re * Math.cos(ang) - c.im * Math.sin(ang);
+      y += c.re * Math.sin(ang) + c.im * Math.cos(ang);
+    }
+    return [x, y];
+  }
+
+  function play() {
+    if (!series) {
+      const path = buildPath();
+      if (!path) return;
+      series = dft(path);
+    }
+    playing = true; t = 0; trail = []; last = performance.now();
+    $("hint").classList.add("hidden");
+    $("play").textContent = "Stop";
+    requestAnimationFrame(frame);
+  }
+  function stop() {
+    playing = false; $("play").textContent = "Play";
+    $("stats").textContent = "";
+  }
+
+  function loadSample() {
+    stop(); series = null;
+    const r = size();
+    const xs = SAMPLE.map((p) => p[0]), ys = SAMPLE.map((p) => p[1]);
+    const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+    const s = Math.min((r.width * 0.82) / w, (r.height * 0.75) / h);
+    const ox = r.width / 2 - s * (Math.min(...xs) + w / 2), oy = r.height / 2 - s * (Math.min(...ys) + h / 2);
+    strokes = [SAMPLE.map(([x, y]) => [ox + s * x, oy + s * y])];
+    drawStrokes(); updateButtons(); play();
+  }
+
+  function updateButtons() {
+    const has = strokes.some((s) => s.length > 1);
+    for (const id of ["play", "undo", "clear", "json"]) $(id).disabled = !has;
+  }
+
+  // ------------------------------------------------------------ wiring
+  $("play").onclick = () => (playing ? stop() : play());
+  $("sample").onclick = loadSample;
+  $("clear").onclick = () => { stop(); series = null; strokes = []; drawStrokes(); updateButtons(); };
+  $("undo").onclick = () => { stop(); series = null; strokes.pop(); drawStrokes(); updateButtons(); };
+  $("circles").oninput = (e) => { $("circlesOut").textContent = e.target.value; trail = []; };
+  $("theme").onchange = (e) => {
+    document.documentElement.dataset.theme = e.target.value;
+    if (!playing) drawStrokes();
+  };
+  $("png").onclick = () => {
+    const a = document.createElement("a");
+    a.download = "fourier-signature.png"; a.href = canvas.toDataURL("image/png"); a.click();
+  };
+  $("json").onclick = () => {
+    const data = { y_down: true, strokes: strokes.map((s) => s.map(([x, y]) => [+x.toFixed(2), +y.toFixed(2)])) };
+    const a = document.createElement("a");
+    a.download = "signature.json";
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
+    a.click();
+  };
+
+  window.addEventListener("resize", resize);
+  resize(); updateButtons();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use Fourier Signature in teaching or research, please cite it as below."
+title: "Fourier Signature: redrawing handwriting with Fourier epicycles"
+version: 1.0.0
+date-released: 2026-11-24
+license: MIT
+repository-code: "https://github.com/001shahab/FourierSignature"
+authors:
+  - family-names: Anbarjafari
+    given-names: Shahab
+    email: shb@3sholding.com

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fourier-signature"
+version = "1.0.0"
+description = "Redraw a signature with rotating circles (Fourier epicycles) and export it as GIF, MP4, animated SVG or poster."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Prof. Shahab Anbarjafari", email = "shb@3sholding.com" }]
+maintainers = [{ name = "Prof. Shahab Anbarjafari", email = "shb@3sholding.com" }]
+keywords = ["fourier", "epicycles", "signature", "animation", "svg", "mathematics", "dft", "visualization"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Multimedia :: Graphics",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Topic :: Education",
+]
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "scikit-image>=0.21",
+  "matplotlib>=3.7",
+  "Pillow>=10.0",
+  "imageio>=2.31",
+  "imageio-ffmpeg>=0.4.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+fourier-signature = "fourier_signature.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/001shahab/FourierSignature"
+Issues = "https://github.com/001shahab/FourierSignature/issues"
+
+[tool.setuptools]
+packages = ["fourier_signature"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
